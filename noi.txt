@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trò chơi nối từ (Chơi Online)</title>
+    <script type="module">
+        // Import các thư viện Firebase
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.4.0/firebase-app.js";
+        import { getDatabase, ref, set, get, onValue, update } from "https://www.gstatic.com/firebasejs/11.4.0/firebase-database.js";
+
+        // Cấu hình Firebase (Cập nhật với thông tin của bạn)
+        const firebaseConfig = {
+            apiKey: "AIzaSyBU6xgRHlac43Wq6WIVG7psqpELTjINb6c",
+            authDomain: "noitugame.firebaseapp.com",
+            databaseURL: "https://noitugame-default-rtdb.firebaseio.com/",
+            projectId: "noitugame",
+            storageBucket: "noitugame.appspot.com",
+            messagingSenderId: "1042094875955",
+            appId: "1:1042094875955:web:cc4e20c64a125b90beca46"
+        };
+
+        // Khởi tạo Firebase
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
+
+        // Biến lưu trạng thái trò chơi
+        let playerId = Math.random().toString(36).substr(2, 5); // Mã người chơi ngẫu nhiên
+        let currentPlayer = "Người chơi 1"; // Người bắt đầu chơi
+
+        // Lắng nghe thay đổi dữ liệu từ Firebase
+        onValue(ref(db, "game/"), (snapshot) => {
+            if (snapshot.exists()) {
+                let data = snapshot.val();
+                document.getElementById("current-word").textContent = data.currentWord;
+                document.getElementById("player-turn").textContent = `Lượt của: ${data.currentPlayer}`;
+                document.getElementById("word-list").innerHTML = ""; // Xóa danh sách cũ
+
+                for (let word of data.wordsUsed) {
+                    let listItem = document.createElement("li");
+                    listItem.textContent = word.player + ": " + word.word;
+                    document.getElementById("word-list").appendChild(listItem);
+                }
+            } else {
+                // Nếu chưa có dữ liệu, tạo dữ liệu ban đầu
+                set(ref(db, "game/"), {
+                    currentWord: "bắt đầu",
+                    currentPlayer: "Người chơi 1",
+                    wordsUsed: []
+                });
+            }
+        });
+
+        // Gửi từ mới lên Firebase
+        function submitWord() {
+            let inputElement = document.getElementById("word-input");
+            let newWord = inputElement.value.trim().toLowerCase();
+            let messageElement = document.getElementById("message");
+
+            get(ref(db, "game/")).then((snapshot) => {
+                if (snapshot.exists()) {
+                    let data = snapshot.val();
+
+                    if (data.currentPlayer !== currentPlayer) {
+                        messageElement.textContent = "Không phải lượt của bạn!";
+                        return;
+                    }
+
+                    if (data.wordsUsed.some(word => word.word === newWord)) {
+                        messageElement.textContent = "Từ này đã được sử dụng!";
+                        return;
+                    }
+
+                    let currentParts = data.currentWord.split(" ");
+                    let lastPart = currentParts[currentParts.length - 1];
+
+                    let newParts = newWord.split(" ");
+                    let firstPart = newParts[0];
+
+                    if (lastPart !== firstPart) {
+                        messageElement.textContent = `Từ mới phải bắt đầu bằng "${lastPart}"`;
+                        return;
+                    }
+
+                    // Cập nhật dữ liệu trên Firebase
+                    update(ref(db, "game/"), {
+                        currentWord: newWord,
+                        currentPlayer: data.currentPlayer === "Người chơi 1" ? "Người chơi 2" : "Người chơi 1",
+                        wordsUsed: [...data.wordsUsed, { word: newWord, player: currentPlayer }]
+                    });
+
+                    inputElement.value = "";
+                    messageElement.textContent = "";
+                }
+            });
+        }
+    </script>
+</head>
+<body>
+    <h1>Trò chơi nối từ (Chơi Online)</h1>
+    <p id="player-turn">Lượt của: Đang chờ...</p>
+    <p>Từ hiện tại: <span id="current-word">Loading...</span></p>
+    <input type="text" id="word-input" placeholder="Nhập từ của bạn">
+    <button onclick="submitWord()">Gửi</button>
+    <p id="message"></p>
+    <h3>Các từ đã nhập:</h3>
+    <ul id="word-list"></ul>
+</body>
+</html>
